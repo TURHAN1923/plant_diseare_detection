@@ -1,0 +1,63 @@
+% Veri kümesinin bulunduğu ana klasör
+datasetPath = 'D:\New Plant Diseases Dataset(Augmented)\New Plant Diseases Dataset(Augmented)\train';
+
+% Veriyi imageDatastore ile yükle
+imds = imageDatastore(datasetPath, ...
+    'IncludeSubfolders', true, ...
+    'LabelSource', 'foldernames');
+
+% Veri kümesindeki sınıfları ve örnek sayılarını göster
+disp(countEachLabel(imds));
+
+% Görselleri yeniden boyutlandırma (örneğin, 224x224)
+imds.ReadFcn = @(filename) imresize(imread(filename), [224 224]);
+
+% Veriyi eğitim ve test için böl
+[trainImds, testImds] = splitEachLabel(imds, 0.8, 'randomized');
+
+options = trainingOptions('adam', ...
+    'InitialLearnRate', 0.001, ...
+    'MaxEpochs', 10, ...
+    'MiniBatchSize', 32, ...
+    'ExecutionEnvironment', 'gpu', ...
+    'Shuffle', 'every-epoch', ...
+    'Plots', 'training-progress', ...
+    'Verbose', false);
+
+augmenter = imageDataAugmenter( ...
+    'RandRotation', [-10, 10], ...
+    'RandXTranslation', [-3, 3], ...
+    'RandYTranslation', [-3, 3]);
+
+trainImds = augmentedImageDatastore([224 224], trainImds, ...
+    'DataAugmentation', augmenter);
+
+
+% CNN Katmanları
+layers = [
+    imageInputLayer([224 224 3]) % Giriş boyutu
+    convolution2dLayer(3, 16, 'Padding', 'same')
+    batchNormalizationLayer
+    reluLayer
+    maxPooling2dLayer(2, 'Stride', 2)
+    
+    convolution2dLayer(3, 32, 'Padding', 'same')
+    batchNormalizationLayer
+    reluLayer
+    maxPooling2dLayer(2, 'Stride', 2)
+    
+    fullyConnectedLayer(2) % İki sınıf (hasta ve sağlıklı)
+    softmaxLayer
+    classificationLayer];
+
+% Eğitim seçenekleri
+options = trainingOptions('adam', ...
+    'InitialLearnRate', 0.001, ...
+    'MaxEpochs', 10, ...
+    'MiniBatchSize', 32, ...
+    'Shuffle', 'every-epoch', ...
+    'Plots', 'training-progress', ...
+    'Verbose', false);
+
+% Modeli Eğit
+proje_1 = trainNetwork(trainImds, layers, options);
